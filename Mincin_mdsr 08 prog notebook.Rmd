@@ -18,9 +18,14 @@ library(partykit)
 library(randomForest)
 library(tibble)
 library(class)
+library(e1071)
+library(nnet)
+library(ROCR)
+library(tidyr)
 
 # user-defined functions here (if any)
 knn_error_rate pg. 183
+get_roc pg. 196
 
 # load data
 
@@ -233,7 +238,293 @@ knn_error_rates %>%
 ```
 
 
+### 8.2.6
 
+```{r}
+# pg. 184
+
+head(train, 1)
+```
+
+```{r}
+# pg. 185
+
+mod_nb <- naiveBayes(form, data = train)
+
+income_nb <- predict(mod_nb, newdata = train)
+
+confusion <- tally(income_nb ~ income, data = train, format = "count")
+
+confusion
+
+sum(diag(confusion)) / nrow(train)
+```
+
+
+### 8.2.7
+
+```{r}
+# pg. 185
+
+mod_nn <- nnet(form, data = train, size = 5)
+```
+
+```{r}
+# pg. 186
+
+income_nn <- predict(mod_nn, newdata = train, type = "class")
+
+confusion <- tally(income_nn ~ income, data = train, format = "count")
+
+confusion
+
+sum(diag(confusion)) / nrow(train)
+```
+
+
+## 8.3
+
+```{r}
+# pg. 186
+
+income_ensemble <- ifelse((income_knn == " >50K") +
+                            (income_nb == " >50K") +
+                            (income_nn == " >50K") >= 2, " >50K", " <=50K")
+
+confusion <- tally(income_ensemble ~ income, data = train, format = "count")
+
+confusion
+
+sum(diag(confusion)) / nrow(train)
+```
+
+
+## 8.4
+
+
+### 8.4.1
+
+
+### 8.4.2
+
+
+### 8.4.3
+
+
+### 8.4.4
+
+```{r}
+# pg. 190
+
+income_probs <-
+  mod_nb %>%
+  predict(newdata = train, type = "raw") %>%
+  as.data.frame()
+
+head(income_probs, 3)
+
+names(income_probs)
+
+tally(~` >50K` > .5, data = income_probs, format = "percent")
+```
+
+```{r}
+# pg. 190
+
+tally(~` >50K` > .24, data = income_probs, format = "percent")
+```
+
+```{r}
+# pg. 190
+
+pred <- ROCR::prediction(income_probs[,2], train$income)
+
+perf <- ROCR::performance(pred, 'tpr', 'fpr')
+
+class(perf)
+```
+
+```{r}
+# pg. 191
+
+perf_df <- data.frame(perf@x.values, perf@y.values)
+
+names(perf_df) <- c("fpr", "tpr")
+
+roc <- 
+  ggplot(data = perf_df, aes(x = fpr, y = tpr)) +
+  geom_line(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, lty = 3) +
+  ylab(perf@y.name) +
+  xlab(perf@x.name)
+```
+
+```{r}
+# pg. 191
+
+confusion <- tally(income_nb ~ income, data = train, format= "count")
+confusion
+
+sum(diag(confusion)) / nrow(train)
+
+tpr <- confusion[" >50K", " >50K"] / sum(confusion[, " >50K"])
+fpr <- confusion[" >50K", " <=50K"] / sum(confusion[, " <=50K"])
+
+roc + geom_point(x = fpr, y = tpr, size = 3)
+```
+
+
+### 8.4.5
+
+```{r}
+# pg. 192
+
+test_q <- 
+  test %>%
+  select(age, education.num, capital.gain, capital.loss, hours.per.week)
+
+test_rates <- sapply(ks, FUN = knn_error_rate, x = train_q, y = train$income, z = test_q)
+
+knn_error_rates <- 
+  knn_error_rates %>%
+  mutate(test_rate = test_rates)
+
+knn_error_rates_tidy <-
+  knn_error_rates %>%
+  gather(key = "type", value = "error_rate", -k)
+
+knn_error_rates_tidy %>%
+  ggplot(aes(x = k, y = error_rate)) +
+  geom_point(aes(color = type)) +
+  geom_line(aes(color = type)) +
+  ylab("Misclassification Rate")
+```
+
+
+### 8.4.6
+
+```{r}
+# pg. 193
+
+favstats(~ capital.gain, data = train)
+
+favstats(~ capital.gain, data = test)
+```
+
+```{r}
+# pg. 193
+
+mod_null <- glm(income ~ 1, data = train, family = binomial)
+
+mods <- list(mod_null, mod_tree, mod_forest, mod_nn, mod_nb)
+
+lapply(mods, class)
+```
+
+```{r}
+# pg. 194
+
+predictions_train <-
+  data.frame(
+    y = as.character(train$income),
+    type = "train",
+    mod_null = predict(mod_null, type = "response"),
+    mod_tree = predict(mod_tree, type = "class"),
+    mod_forest = predict(mod_forest, type = "class"),
+    mod_nn = predict(mod_nn, type = "class"),
+    mod_nb = predict(mod_nb, newdata = train, type = "class"))
+
+predictions_test <-
+  data.frame(
+    y = as.character(test$income),
+    type = "test",
+    mod_null = predict(mod_null, newdata = test, type = "response"),
+    mod_tree = predict(mod_tree, newdata = test, type = "class"),
+    mod_forest = predict(mod_forest, newdata = test, type = "class"),
+    mod_nn = predict(mod_nn, newdata = test, type = "class"),
+    mod_nb = predict(mod_nb, newdata = test, type = "class"))
+
+predictions <- bind_rows(predictions_train, predictions_test)
+
+glimpse(predictions)
+```
+
+```{r}
+# pg. 195
+
+predictions_tidy <-
+  predictions %>%
+  mutate(mod_null = ifelse(mod_null < .5, " <=50K")) %>%
+  gather(key = "model", value = "y_hat", -type, -y)
+
+glimpse(predictions_tidy)
+```
+
+```{r}
+# pg. 195
+
+predictions_summary <-
+  predictions_tidy %>%
+  group_by(model, type) %>%
+  summarize(N = n(), correct = sum(y == y_hat, 0),
+            positives = sum(y == " >50K"),
+            true_pos = sum(y_hat == " >50K" & y == y_hat),
+            false_pos = sum(y_hat == " >50K" & != y-hat)) %>%
+  mutate(accuracy = correct / N,
+         tpr = true_pos / positives,
+         fpr = false_pos / (N - positives)) %>%
+  ungroup() %>%
+  gather(val_type, val, -model, -type) %>%
+  unite(temp1, type, val_type, sep = "_") %>%
+  spread(temp1, val) %>%
+  arrange(desc(test_accuracy)) %>%
+  select(model, train_accuracy, test_accuracy, test_tpr, test_fpr)
+
+predictions_summary
+```
+
+```{r}
+# pg. 196
+
+outputs <- c("response", "prob", "prob", "raw", "raw")
+
+roc_test <-
+  mapply(predict, mods, type = outputs, MoreArgs = list(newdata = test)) %>%
+  as.data.frame() %>%
+  select(1,3,5,6,8)
+
+names(roc_test) <- c("mod_null", "mod_tree", "mod_forest", "mod_nn", "mod_nb")
+
+glimpse(roc_test)
+
+get_roc <- function(x, y) {
+  pred <- ROCR::prediction(x$y_hat, y)
+  perf <- ROCR::performance(pred, 'tpr', 'fpr')
+  perf_df <- data.frame(perf@x.values, perf@y.values)
+  names(perf_df) <- c("fpr", "tpr")
+  return(perf_df)
+}
+
+roc_tidy <-
+  roc_test %>%
+  gather(key = "model", value = "y_hat") %>%
+  group_by(model) %>%
+  dplyr::do(get_roc(., y = test$income))
+```
+
+```{r}
+# pg. 196
+
+ggplot(data = roc_tidy, aes(x = fpr, y = tpr)) +
+  geom_line(aes(color = model)) +
+  geom_abline(intercept = 0, slope = 1, lty =3) =
+  ylab(perf@y.name) +
+  xlab(perf@x.name) +
+  geom_point(data = predictions_summary, size = 3, aes(x = test_fpr, y = test_tpr, color= model))
+```
+
+
+## 8.5
 
 
 
