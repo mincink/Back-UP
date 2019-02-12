@@ -22,13 +22,15 @@ library(e1071)
 library(nnet)
 library(ROCR)
 library(tidyr)
+library(NHANES)
 
 # user-defined functions here (if any)
-knn_error_rate pg. 183
-get_roc pg. 196
+    #knn_error_rate   inputs: x, y, numNeighbors  output: optimal value of k
+    #get_roc    inputs: x, y  output: perf_df
 
 # load data
-
+  data("NHANES") #from NHANES package
+  data("census") #csv form online
 
 ```
 
@@ -454,7 +456,7 @@ glimpse(predictions)
 
 predictions_tidy <-
   predictions %>%
-  mutate(mod_null = ifelse(mod_null < .5, " <=50K")) %>%
+  mutate(mod_null = ifelse(mod_null < .5, " <=50K", " >50K")) %>%
   gather(key = "model", value = "y_hat", -type, -y)
 
 glimpse(predictions_tidy)
@@ -469,7 +471,7 @@ predictions_summary <-
   summarize(N = n(), correct = sum(y == y_hat, 0),
             positives = sum(y == " >50K"),
             true_pos = sum(y_hat == " >50K" & y == y_hat),
-            false_pos = sum(y_hat == " >50K" & != y-hat)) %>%
+            false_pos = sum(y_hat == " >50K" & y != y_hat)) %>%
   mutate(accuracy = correct / N,
          tpr = true_pos / positives,
          fpr = false_pos / (N - positives)) %>%
@@ -525,6 +527,129 @@ ggplot(data = roc_tidy, aes(x = fpr, y = tpr)) +
 
 
 ## 8.5
+
+```{r}
+# pg. 197 
+
+people <-
+  NHANES %>%
+  select(Age, Gender, Diabetes, BMI, HHIncome, PhysActive) %>%
+  na.omit()
+
+glimpse(people)
+
+tally(~ Diabetes, data = people, format = "percent")
+```
+
+```{r}
+# pg. 197
+
+whoIsDiabetic <- rpart(Diabetes ~ Age + BMI + Gender + PhysActive, data = people, 
+                       control = rpart.control(cp = .005, minbucket = 30))
+
+whoIsDiabetic
+
+plot(as.party(whoIsDiabetic))
+```
+
+```{r}
+# pg. 198
+
+people %>%
+  ggplot(aes(x = Age, y = BMI)) +
+  geom_count(aes(color = Diabetes), alpha = 0.5) +
+  geom_vline(xintercept = 52.5) +
+  geom_segment(x = 52.5, xend = 100, y = 39.985, yend = 39.985) +
+  geom_segment(x = 67.5, xend = 67.5, y = 39.985, yend = Inf) +
+  geom_segment(x = 60.5, xend = 60.5, y = 39.985, yend = Inf) +
+  annotate("rect", xmin = 60.5, xmax = 67.5, ymin = 39.985, ymax = Inf, fill = "blue", alpha = 0.1)
+  
+```
+
+```{r}
+# pg. 199 
+
+ages <- range(~ Age, data = people)
+bmis <- range(~ BMI, data = people)
+res <- 100
+
+fake_grid <- expand.grid(
+  Age = seq(from = ages[1], to = ages[2], length.out = res),
+  BMI = seq(from = bmis[1], to = bmis[2], length.out = res))
+```
+
+```{r}
+# pg. 199
+
+form <- as.formula("Diabetes ~ Age + BMI")
+
+dmod_tree <- rpart(form, data = people, control = rpart.control(cp = .005, minbucket = 30))
+
+dmod_forest <- randomForest(form, data = people, ntree = 201, mtry = 3)
+
+dmod_nnet <- nnet(form, data = people, size = 6)
+
+dmod_nb <- naiveBayes(form, data = people)
+
+
+pred_tree <- predict(dmod_tree, newdata = fake_grid)[, "Yes"]
+
+pred_forest <- predict(dmod_forest, newdata = fake_grid, type = "prob")[, "Yes"]
+
+pred_knn <- 
+  people %>%
+  select(Age, BMI) %>%
+  knn(test = select(fake_grid, Age, BMI), cl = people$Diabetes, k = 5) %>%
+  as.numeric() - 1
+
+pred_nnet <- predict(dmod_nnet, newdata = fake_grid, type = "raw") %>%
+  as.numeric()
+
+pred_nb <- predict(dmod_nb, newdata = fake_grid, type = "raw")[, "Yes"]
+```
+
+```{r}
+# pg. 200
+
+p <- tally(~ Diabetes, data = people, format = "proportion")["Yes"]
+
+res <- 
+  fake_grid %>%
+  mutate(
+    "Null" = rep(p, nrow(fake_grid)), "Decision Tree" = pred_tree, "Random Forest" = pred_forest, 
+    "k-Nearest Neighbor" = pred_knn, "Neural Network" = pred_nnet, "Naive Bayes" = pred_nb) %>%
+  gather(key = "model", value = "y_hat", -Age, -BMI)
+```
+
+```{r}
+# pg. 201
+
+ggplot(data = res, aes(x = Age, y = BMI)) +
+  geom_tile(aes(fill = y_hat), color = NA) +
+  geom_count(aes(color = Diabetes), alpha = .4, data = people) +
+  scale_fill_gradient(low = "white", high = "dodgerblue") +
+  scale_color_manual(values = c("gray", "gold")) +
+  scale_size(range = c(0, 2)) +
+  scale_x_continuous(expand = c(.02, 0)) +
+  scale_y_continuous(expand = c(.02, 0)) +
+  facet_wrap(~model)
+```
+
+
+## 8.6
+
+
+## 8.7
+
+
+
+
+
+
+
+
+
+
 
 
 
