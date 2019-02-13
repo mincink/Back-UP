@@ -1,0 +1,42 @@
+---
+title: "09-mdsr-Mincin"
+author: "Kimberly Mincin"
+date: "February 24, 2019"
+output: html_notebook
+---
+
+# Front Matter
+```{r}
+rm(list = ls())
+
+#load packages
+library(mdsr)
+
+#functions
+
+
+
+#load data
+
+
+```
+
+
+## 9.1
+
+
+### 9.1.1
+
+```{r}
+download.file("https://www.fueleconomy.gov/feg/epadata/16data.zip", destfile = "data/fueleconomy.zip")
+unzip("data/fueleconomy.zip", exdir = "data/fueleconomy/")
+```
+
+
+
+
+
+
+
+
+
