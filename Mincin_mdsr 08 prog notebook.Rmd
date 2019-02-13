@@ -2,7 +2,7 @@
 title: "Mincin_mdsr 08 prog notebook"
 author: "Kimberly Mincin"
 date: "2/17/2019"
-output: html_document
+output: html_notebook
 ---
 
 # Front matter
@@ -519,7 +519,7 @@ roc_tidy <-
 
 ggplot(data = roc_tidy, aes(x = fpr, y = tpr)) +
   geom_line(aes(color = model)) +
-  geom_abline(intercept = 0, slope = 1, lty =3) =
+  geom_abline(intercept = 0, slope = 1, lty = 3) +
   ylab(perf@y.name) +
   xlab(perf@x.name) +
   geom_point(data = predictions_summary, size = 3, aes(x = test_fpr, y = test_tpr, color= model))
@@ -585,7 +585,7 @@ form <- as.formula("Diabetes ~ Age + BMI")
 
 dmod_tree <- rpart(form, data = people, control = rpart.control(cp = .005, minbucket = 30))
 
-dmod_forest <- randomForest(form, data = people, ntree = 201, mtry = 3)
+dmod_forest <- randomForest(form, data = people, ntree = 201, mtry = 2)
 
 dmod_nnet <- nnet(form, data = people, size = 6)
 
