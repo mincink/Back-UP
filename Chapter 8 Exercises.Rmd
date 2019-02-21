@@ -1,0 +1,155 @@
+---
+title: "STAT 380 Homework Exercises"
+subtitle: "MDSR Chapter 08"
+author: "Kimberly Mincin"
+date: "Due: 24/02/2019"
+output: html_notebook
+---
+
+# Front matter
+
+```{r}
+# always clean up R environment
+rm(list = ls())
+
+# load all packages here
+library(NHANES)
+library(rpart)
+library(randomForest)
+library(class)
+library(e1071)
+library(nnet)
+library(glmnet)
+```
+
+
+# Exercises
+
+### Exercise 8.1
+
+Null Model
+```{r}
+mod_null <- tally(~SleepTrouble, data = NHANES, format = "percent")
+
+mod_null
+```
+
+Logistic Regression
+```{r}
+mod_logit <- glm(SleepTrouble ~ PhysActive, data = NHANES, family = "binomial")
+msummary(mod_logit)
+
+SleepTrouble_logitProb <- predict(mod_logit, newdata = NHANES, type = "response")
+SleepTrouble_logit <- ifelse(SleepTrouble_logitProb > .5, yes = "yes", "no")
+confusion <- tally(SleepTrouble_logit ~ SleepTrouble, data = NHANES, format = "count")
+confusion
+
+logit_acc <- sum(diag(confusion)) / nrow(NHANES) * 100
+logit_acc
+```
+
+
+Decision Tree
+```{r}
+rpart(SleepTrouble ~ PhysActive, data = NHANES)
+```
+```{r}
+NHANES %>%
+  ggplot(aes(x = PhysActive, y = SleepTrouble)) +
+  geom_point(position = position_jitter(width = .15, height =.15), alpha = .07)
+```
+
+
+Random Forest
+```{r}
+mod_Forest <- randomForest(SleepTrouble ~ PhysActive, data = NHANES, ntree = 2000, mtry =2)
+
+mod_Forest
+```
+
+Neural Network
+```{r}
+mod_nnet <- nnet(SleepTrouble ~ PhysActive, data = NHANES, size = 3)
+
+SleepTrouble_nn <- predict(mod_nnet, newdata = NHANES, type = "class")
+confusion <- tally(SleepTrouble_nn ~ SleepTrouble, data = NHANES, format = "count")
+confusion
+
+nnet_acc <- sum(diag(confusion)) / nrow(NHANES) * 100
+nnet_acc
+```
+
+Naive Bayes
+```{r}
+mod_nb <- naiveBayes(SleepTrouble ~ PhysActive, data = NHANES)
+
+SleepTrouble_nb <- predict(mod_nb, newdata = NHANES)
+
+confusion <- tally(SleepTrouble_nb ~ SleepTrouble, data = NHANES, format = "count")
+confusion
+
+nb_acc <- sum(diag(confusion)) / nrow(NHANES) * 100
+nb_acc
+```
+
+k-NN
+```{r}
+SleepTrouble_knn <- knn(train = NHANES, test = NHANES, cl = NHANES$SleepTrouble, k = 5)
+
+confusion <- tally(SleepTrouble_knn ~ SleepTrouble, data = NHANES, format = "count")
+confusion
+```
+
+
+### Exercise 8.2
+
+Null Model
+```{r}
+mod_null <- tally(~ SleepTrouble, data = NHANES, format = "percent")
+
+mod_null
+```
+
+Multiple Regression
+```{r}
+
+```
+
+Regression Tree
+```{r}
+
+```
+
+Random Forest
+```{r}
+mod_Forest <- randomForest(SleepTrouble ~ SleepHrsNight, data = NHANES, ntree = 2000, mtry =2)
+
+mod_Forest
+```
+
+Ridge Regression
+```{r}
+
+```
+
+LASSO
+```{r}
+NHANES_matrix <-
+  NHANES_quant %>%
+  mutate(yes = ifelse(NHANES$SleepTrouble == "yes", 1, 0)) %>%
+  as.matrix()
+
+mod_lasso <- glmnet(x = NHANES_matrix, y = NHANES$SleepTrouble, family = "binomial", alpha = 1)
+
+plot(mod_lasso)
+```
+
+
+
+### Exercise 8.3
+
+
+
+
+
+

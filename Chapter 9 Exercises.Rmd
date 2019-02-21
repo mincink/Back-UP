@@ -17,6 +17,7 @@ library(mdsr)
 library(readxl)
 library(ape)
 library(Lahman)
+library(mclust)
 ```
 
 
@@ -108,6 +109,24 @@ hof <-
   filter(inducted == "Y" & votedBy == "BBWAA") %>%
   summarize(tH = sum(H), tHR = sum(HR), tRBI = sum(RBI), tSB = sum(SB)) %>%
   filter(tH > 1000)
+
+glimpse(hof)
+```
+
+```{r}
+bb_clusts <-
+  hof %>%
+  kmeans(centers = 4) %>%
+  fitted("classes") %>%
+  as.character()
+
+hof <- 
+  hof %>%
+  mutate(cluster = bb_clusts)
+
+hof %>%
+  ggplot(aes(x = tH, y = tRBI)) +
+  geom_point(aes(color = cluster), alpha = .5)
 ```
 
 
