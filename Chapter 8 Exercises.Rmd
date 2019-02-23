@@ -20,6 +20,19 @@ library(class)
 library(e1071)
 library(nnet)
 library(glmnet)
+library(partykit)
+```
+
+```{r}
+SleepHabits <- 
+  NHANES %>%
+  select("SleepTrouble", "PhysActive", "Age", "Pulse", "Poverty", "DaysMentHlthBad", 
+         "BMI", "Gender", "DaysPhysHlthBad") %>%
+  na.omit()
+```
+
+```{r}
+pairs(SleepHabits)
 ```
 
 
@@ -29,14 +42,16 @@ library(glmnet)
 
 Null Model
 ```{r}
-mod_null <- tally(~SleepTrouble, data = NHANES, format = "percent")
+mod_null <- tally(~SleepTrouble, data = SleepHabits, format = "percent")
 
 mod_null
 ```
+The Null model is accurate 74.20 % of the time by simply guessing no for each cases in the data. 
+
 
 Logistic Regression
 ```{r}
-mod_logit <- glm(SleepTrouble ~ PhysActive, data = NHANES, family = "binomial")
+mod_logit <- glm(SleepTrouble ~ ., data = SleepHabits, family = "binomial")
 msummary(mod_logit)
 
 SleepTrouble_logitProb <- predict(mod_logit, newdata = NHANES, type = "response")
@@ -47,56 +62,76 @@ confusion
 logit_acc <- sum(diag(confusion)) / nrow(NHANES) * 100
 logit_acc
 ```
+The logistic regression model is accurate 64.79 % of the time. This is worse than the null model.
 
 
 Decision Tree
 ```{r}
-rpart(SleepTrouble ~ PhysActive, data = NHANES)
+mod_tree <- rpart(SleepTrouble ~ ., data = SleepHabits)
+mod_tree
+
+plot(as.party(mod_tree))
 ```
 ```{r}
-NHANES %>%
-  ggplot(aes(x = PhysActive, y = SleepTrouble)) +
-  geom_point(position = position_jitter(width = .15, height =.15), alpha = .07)
+Sleep_tree <- 
+  SleepHabits %>%
+  mutate(sleep_dtree = predict(mod_tree, type = "class"))
+confusion <- tally(sleep_dtree ~ SleepTrouble, data = Sleep_tree, format = "count")
+confusion
+
+sum(diag(confusion)) / nrow(SleepHabits) * 100
+
 ```
+The decision tree is accurate 75.57 % of the time. This is slightly better than the null model.
 
 
 Random Forest
 ```{r}
-mod_Forest <- randomForest(SleepTrouble ~ PhysActive, data = NHANES, ntree = 2000, mtry =2)
+mod_forest <- randomForest(SleepTrouble ~ ., data = SleepHabits, ntree = 2000, mtry =3)
 
-mod_Forest
+mod_forest
 ```
+```{r}
+rf_acc <- sum(diag(mod_forest$confusion)) / nrow(SleepHabits) * 100
+rf_acc
+```
+The random forest is accurate 89.93 % of the time. This is much better than the null model, and might indicate overfitting the data. 
+
 
 Neural Network
 ```{r}
-mod_nnet <- nnet(SleepTrouble ~ PhysActive, data = NHANES, size = 3)
+mod_nnet <- nnet(SleepTrouble ~ ., data = SleepHabits, size = 3)
 
-SleepTrouble_nn <- predict(mod_nnet, newdata = NHANES, type = "class")
-confusion <- tally(SleepTrouble_nn ~ SleepTrouble, data = NHANES, format = "count")
+SleepTrouble_nn <- predict(mod_nnet, newdata = SleepHabits, type = "class")
+confusion <- tally(SleepTrouble_nn ~ SleepTrouble, data = SleepHabits, format = "count")
 confusion
 
 nnet_acc <- sum(diag(confusion)) / nrow(NHANES) * 100
 nnet_acc
 ```
+The Neural network is accurate 47.96 % of the time. This is noticeably worse than the null model, so the neural network is not a good predictor for the data.
+
 
 Naive Bayes
 ```{r}
-mod_nb <- naiveBayes(SleepTrouble ~ PhysActive, data = NHANES)
+mod_nb <- naiveBayes(SleepTrouble ~ ., data = SleepHabits)
 
-SleepTrouble_nb <- predict(mod_nb, newdata = NHANES)
+SleepTrouble_nb <- predict(mod_nb, newdata = SleepHabits)
 
-confusion <- tally(SleepTrouble_nb ~ SleepTrouble, data = NHANES, format = "count")
+confusion <- tally(SleepTrouble_nb ~ SleepTrouble, data = SleepHabits, format = "count")
 confusion
 
-nb_acc <- sum(diag(confusion)) / nrow(NHANES) * 100
+nb_acc <- sum(diag(confusion)) / nrow(SleepHabits) * 100
 nb_acc
 ```
+The Naive Bayes model is accurate 73.52 % of the time. This is better than the neural network but still slightly worse than the null model. 
+
 
 k-NN
 ```{r}
-SleepTrouble_knn <- knn(train = NHANES, test = NHANES, cl = NHANES$SleepTrouble, k = 5)
+SleepTrouble_knn <- knn(train = SleepHabits, test = SleepHabits, cl = SleepHabits$SleepTrouble, k = 5)
 
-confusion <- tally(SleepTrouble_knn ~ SleepTrouble, data = NHANES, format = "count")
+confusion <- tally(SleepTrouble_knn ~ SleepTrouble, data = SleepHabits, format = "count")
 confusion
 ```
 
@@ -135,7 +170,7 @@ Ridge Regression
 LASSO
 ```{r}
 NHANES_matrix <-
-  NHANES_quant %>%
+  NHANES %>%
   mutate(yes = ifelse(NHANES$SleepTrouble == "yes", 1, 0)) %>%
   as.matrix()
 
@@ -148,6 +183,17 @@ plot(mod_lasso)
 
 ### Exercise 8.3
 
+```{r}
+set.seed(144) 
+
+n <- nrow(NHANES)
+test_idx <- sample.int(n, size = round(0.25 * n)) # select row numbers for the test set
+train <- NHANES[-test_idx, ]  # exclude the test set cases
+nrow(train)
+
+test <- NHANES[test_idx, ]    # test set cases only
+nrow(test)
+```
 
 
 
