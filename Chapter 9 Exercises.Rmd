@@ -114,20 +114,15 @@ glimpse(hof)
 ```
 
 ```{r}
-bb_clusts <-
+hof_clusts <- 
   hof %>%
-  kmeans(centers = 4) %>%
-  fitted("classes") %>%
-  as.character()
+  select("tH", "tHR", "tRBI", "tSB") %>%
+  kmeans(centers = 5)
 
-hof <- 
-  hof %>%
-  mutate(cluster = bb_clusts)
+hof_clusts
 
-hof %>%
-  ggplot(aes(x = tH, y = tRBI)) +
-  geom_point(aes(color = cluster), alpha = .5)
 ```
+
 
 
 
